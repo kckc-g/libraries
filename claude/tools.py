@@ -3,10 +3,12 @@ Local tools for Claude API agent
 """
 
 import os
+import threading
+import logging
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 # Import calendar functions
 from icloud.calendar import (
@@ -17,6 +19,46 @@ from icloud.calendar import (
     create_reminder,
     update_reminder,
 )
+
+from replicate.api import REPLICATE_API
+
+logger = logging.getLogger(__name__)
+
+
+def _run_image_generation(prompt: str, aspect_ratio: str):
+    """Background worker for image generation."""
+    try:
+        url = REPLICATE_API.generate_image(prompt, aspect_ratio=aspect_ratio)
+        logger.info(f"Image generated successfully: {url}")
+    except Exception as e:
+        logger.error(f"Image generation failed: {e}")
+
+
+def generate_image(
+    prompt: str, aspect_ratio: Literal["3:2", "2:3"] = "3:2"
+) -> Dict[str, Any]:
+    """
+    Queue an image generation job using Replicate's Flux model.
+    The job runs asynchronously in the background.
+
+    Args:
+        prompt: The image generation prompt
+        aspect_ratio: Either "3:2" (landscape) or "2:3" (portrait). Defaults to "3:2".
+    """
+    if aspect_ratio not in ("3:2", "2:3"):
+        return {"error": f"Invalid aspect_ratio: {aspect_ratio}. Must be '3:2' or '2:3'"}
+
+    if not prompt or not prompt.strip():
+        return {"error": "Prompt cannot be empty"}
+
+    thread = threading.Thread(
+        target=_run_image_generation,
+        args=(prompt.strip(), aspect_ratio),
+        daemon=True,
+    )
+    thread.start()
+
+    return f"Image generation job queued with prompt: '{prompt}' (aspect_ratio: {aspect_ratio})"
 
 
 # Configuration: Directory to search for markdown files
@@ -353,6 +395,25 @@ def update_todo(todo_id: int, description: str) -> Dict[str, Any]:
 # Tool definitions in Claude API format
 LOCAL_TOOLS = [
     {
+        "name": "image__generate",
+        "description": "Generate an image using AI (Flux model via Replicate). The job runs asynchronously in the background. Use this when the user asks to create, generate, or make an image.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "The image generation prompt describing what to create.",
+                },
+                "aspect_ratio": {
+                    "type": "string",
+                    "enum": ["3:2", "2:3"],
+                    "description": "Aspect ratio: '3:2' for landscape or '2:3' for portrait. Defaults to '3:2'.",
+                },
+            },
+            "required": ["prompt"],
+        },
+    },
+    {
         "name": "get_current_datetime",
         "description": "Returns the current date and time. (timezone is Asia/Singapore timezone)",
         "input_schema": {
@@ -613,6 +674,7 @@ LOCAL_TOOLS = [
 
 # Map tool names to their implementation functions
 TOOL_HANDLERS = {
+    "image__generate": generate_image,
     "get_current_datetime": get_current_datetime,
     "markdown__list_markdown_files": list_markdown_files,
     "markdown__read_markdown_file": read_markdown_file,
