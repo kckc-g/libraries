@@ -46,7 +46,9 @@ def generate_image(
         aspect_ratio: Either "3:2" (landscape) or "2:3" (portrait). Defaults to "3:2".
     """
     if aspect_ratio not in ("3:2", "2:3"):
-        return {"error": f"Invalid aspect_ratio: {aspect_ratio}. Must be '3:2' or '2:3'"}
+        return {
+            "error": f"Invalid aspect_ratio: {aspect_ratio}. Must be '3:2' or '2:3'"
+        }
 
     if not prompt or not prompt.strip():
         return {"error": "Prompt cannot be empty"}
@@ -395,8 +397,8 @@ def update_todo(todo_id: int, description: str) -> Dict[str, Any]:
 # Tool definitions in Claude API format
 LOCAL_TOOLS = [
     {
-        "name": "image__generate",
-        "description": "Generate an image using AI (Flux model via Replicate). The job runs asynchronously in the background. Use this when the user asks to create, generate, or make an image.",
+        "name": "replicate__image_generate",
+        "description": "Generate an image using AI. The job runs asynchronously in the background. Use this when the user asks to create, generate, or make an image.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -674,7 +676,7 @@ LOCAL_TOOLS = [
 
 # Map tool names to their implementation functions
 TOOL_HANDLERS = {
-    "image__generate": generate_image,
+    "replicate__image_generate": generate_image,
     "get_current_datetime": get_current_datetime,
     "markdown__list_markdown_files": list_markdown_files,
     "markdown__read_markdown_file": read_markdown_file,
